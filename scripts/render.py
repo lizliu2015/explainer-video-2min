@@ -63,6 +63,26 @@ def say(text, speed, key=None):
         idx = np.linspace(0, len(x) - 1, int(len(x) * SR / a.sample_rate)); x = np.interp(idx, np.arange(len(x)), x).astype(np.float32)
     return x
 
+def silences(fn):
+    """返回配音里每个停顿结束、下一句开口前的时刻（秒）。用于把句子/字幕边界吸附到真实停顿上。"""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", fn, "-af", "silencedetect=noise=-38dB:d=0.12", "-f", "null", "-"], capture_output=True, text=True).stderr
+    st = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", r)]
+    en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r)]
+    return [max(a, b - 0.05) for a, b in zip(st, en)]
+
+def snap(expected, sil, win):
+    """把预估边界吸附到最近的停顿（窗口内、单调递增），否则保留预估值。"""
+    out, used, last = [], set(), -1
+    for e in expected:
+        best = None
+        for i, x in enumerate(sil):
+            if i in used or x <= last or abs(x - e) > win: continue
+            if best is None or abs(x - e) < abs(sil[best] - e): best = i
+        v = sil[best] if best is not None else max(e, last + 0.05)
+        if best is not None: used.add(best)
+        out.append(v); last = v
+    return out
+
 def sentences(t):
     parts = re.findall(r"[^。！？!?]+[。！？!?」”]*", t.strip())
     return [p.strip() for p in parts if p.strip()]
@@ -215,6 +235,7 @@ def progress(img, frac):
 # ---------- 主流程 ----------
 speed = SB.get("speed", 0.95)
 gap_s, tail_s = 0.25, 0.45
+scene_tail = SB.get("scene_tail", 1.0)  # 整场景配音模式：说完后画面再停留的秒数
 voice_file = SB.get("voice_file")  # 外部整段配音时，场景时长取 sc["dur"]
 all_audio, plan, total = [], [], 0.0
 for si, sc in enumerate(SB["scenes"]):
@@ -225,14 +246,19 @@ for si, sc in enumerate(SB["scenes"]):
         # 整场景一段配音（ElevenLabs）：字幕/卡片按字数比例分配时间
         a = say(None, speed, f"{si+1:02d}"); dl = len(a) / SR
         sents = sentences(sc.get("narration", ""))
-        tot = sum(len(x) for x in sents) or 1; c = t; sc["_starts"] = []
+        # 字幕行 + 句首标记；按字数估边界，再吸附到配音的真实停顿上
+        lines, heads = [], []
         for x in sents:
-            sc["_starts"].append(c)
-            ls = sub_lines(x, 16 if VERT else 22); xl = dl * len(x) / tot; lt = sum(len(l) for l in ls) or 1
-            for l in ls:
-                ld = xl * len(l) / lt; cues.append((c, c + ld, clean(l))); c += ld
+            ls = sub_lines(x, 16 if VERT else 22); heads.append(len(lines)); lines += ls
+        w = [len(re.sub(r"[，。,\.；;：:、！？!?「」“”]", "", l)) or 1 for l in lines]
+        cum = np.cumsum(w) / sum(w) * dl
+        sil = silences(scene_mp3)
+        edges = snap(list(cum[:-1]), [x for x in sil if 0.2 < x < dl - 0.2], 0.9)
+        b = [0.0] + edges + [dl]
+        for k, l in enumerate(lines): cues.append((t + b[k], t + b[k + 1], clean(l)))
+        sc["_starts"] = [t + b[h] for h in heads]
         chunks.append(a); t += dl
-        dur = t + tail_s; chunks.append(np.zeros(int(SR * tail_s), np.float32))
+        dur = t + scene_tail; chunks.append(np.zeros(int(SR * scene_tail), np.float32))
     elif voice_file:
         dur = float(sc["dur"])
         lines = [l for s in sentences(sc.get("narration", "")) for l in sub_lines(s, 16 if VERT else 22)]

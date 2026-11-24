@@ -46,6 +46,11 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 - 结尾回扣开头的钩子。
 - 禁：书面连接词（“此外”“综上所述”）、长定语、括号、英文缩写不解释。
 
+**节奏（停顿要落在画面变化上）**
+- 一个场景 = 一段话 = 一个画面，3–5 句。画面变化只发生在句首：用 `cue` 把每张卡片绑到讲它的那一句。
+- 每个场景说完后画面停约 1 秒（`scene_tail`，默认 1.0）；金句、总结场景设 1.5。
+- 列表的最后一张卡片至少在场景结束前 2 秒出现，不要让卡片刚出来就切走。
+
 **TTS 朗读修正**（写进 narration 前处理）
 - 数字/年份/单位写成要读的样子：`2027年`→`二〇二七年`，`50%`→`百分之五十`，`3:1`→`三比一`。
 - 多音字有歧义时换同义词（如“行”“重”“长”）。
@@ -77,12 +82,17 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 
 **工具**：ElevenLabs 连接器的 `creative_create_flow`、`creative_generate_speech`、`creative_get_flow_run_status`。不在工具列表里 → 先用 ToolSearch 搜 `ElevenLabs generate speech`；仍没有 → 请用户在 claude.ai 连接 ElevenLabs 连接器，然后开新对话。
 
-**流程**（稿子定稿后再做，每次生成都扣积分）：
+**确认点（花积分之前）**
+- 用户在场：先用 SendUserMessage 发出完整口播稿（按场景分段，标出总字数和预估时长），等用户回“好/可以”或改稿后再配音。用户只改个别场景，就只改那几场。
+- 用户不在场（定时任务、说过稍后回来、问题没人回）：直接按稿配音，交付时说明稿子没经过确认。
+- 配音后先跑 PREVIEW 看 `TOTAL` 和关键帧；需要整片重配时先告诉用户，不要悄悄重配。
+
+**流程**（每次生成都扣积分）：
 1. `creative_create_flow`（name = 视频标题）→ 记下 `flow_id`，本视频所有配音都放这个 flow。
 2. 每个场景调用一次 `creative_generate_speech`：`prompt` = 该场景 narration 全文，`voice_id` = `E3IuT6dcpXhUwXqAw9Or`，`model_id` = `eleven_v4`，`generations_count` = 1，`flow_id` = 上一步的。各场景可在同一轮并发发出。**绝不重复调用来重试**（会再扣一次）。
 3. 等约 10 秒，用 `creative_get_flow_run_status`（flow_id + 全部 session_ids）取每个生成的 `media[].url`，按 prompt 对应回场景。
 4. 下载：`curl -sS -o audio/01.mp3 "<url>"`（场景号两位数）。下载被拒（403 / CONNECT tunnel failed）→ 告诉用户：在 claude.ai 的 设置 → Capabilities 允许的域名里加上 `elevenlabsusercontent.com`，加好后再继续。不要换别的方式绕过。
-5. storyboard.json 加 `"audio_dir": "audio"`。渲染器读 `audio/<场景号>.mp3`，按字数比例对齐字幕和卡片（`cue` 仍然有效）。
+5. storyboard.json 加 `"audio_dir": "audio"`。渲染器读 `audio/<场景号>.mp3`，先按字数估算字幕边界，再自动吸附到配音里的真实停顿（实测误差约 0.03 秒）；卡片按 `cue` 在对应句子开口时出现。
 6. 改稿时只重新生成改动的场景，覆盖对应 mp3。
 
 **成本**：约 1 积分/字（实测 30 字 = 31 积分），2 分钟视频约 520–560 积分。
@@ -176,6 +186,26 @@ def say(text, speed, key=None):
     if a.sample_rate != SR:  # 简单重采样
         idx = np.linspace(0, len(x) - 1, int(len(x) * SR / a.sample_rate)); x = np.interp(idx, np.arange(len(x)), x).astype(np.float32)
     return x
+
+def silences(fn):
+    """返回配音里每个停顿结束、下一句开口前的时刻（秒）。用于把句子/字幕边界吸附到真实停顿上。"""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", fn, "-af", "silencedetect=noise=-38dB:d=0.12", "-f", "null", "-"], capture_output=True, text=True).stderr
+    st = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", r)]
+    en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r)]
+    return [max(a, b - 0.05) for a, b in zip(st, en)]
+
+def snap(expected, sil, win):
+    """把预估边界吸附到最近的停顿（窗口内、单调递增），否则保留预估值。"""
+    out, used, last = [], set(), -1
+    for e in expected:
+        best = None
+        for i, x in enumerate(sil):
+            if i in used or x <= last or abs(x - e) > win: continue
+            if best is None or abs(x - e) < abs(sil[best] - e): best = i
+        v = sil[best] if best is not None else max(e, last + 0.05)
+        if best is not None: used.add(best)
+        out.append(v); last = v
+    return out
 
 def sentences(t):
     parts = re.findall(r"[^。！？!?]+[。！？!?」”]*", t.strip())
@@ -329,6 +359,7 @@ def progress(img, frac):
 # ---------- 主流程 ----------
 speed = SB.get("speed", 0.95)
 gap_s, tail_s = 0.25, 0.45
+scene_tail = SB.get("scene_tail", 1.0)  # 整场景配音模式：说完后画面再停留的秒数
 voice_file = SB.get("voice_file")  # 外部整段配音时，场景时长取 sc["dur"]
 all_audio, plan, total = [], [], 0.0
 for si, sc in enumerate(SB["scenes"]):
@@ -339,14 +370,19 @@ for si, sc in enumerate(SB["scenes"]):
         # 整场景一段配音（ElevenLabs）：字幕/卡片按字数比例分配时间
         a = say(None, speed, f"{si+1:02d}"); dl = len(a) / SR
         sents = sentences(sc.get("narration", ""))
-        tot = sum(len(x) for x in sents) or 1; c = t; sc["_starts"] = []
+        # 字幕行 + 句首标记；按字数估边界，再吸附到配音的真实停顿上
+        lines, heads = [], []
         for x in sents:
-            sc["_starts"].append(c)
-            ls = sub_lines(x, 16 if VERT else 22); xl = dl * len(x) / tot; lt = sum(len(l) for l in ls) or 1
-            for l in ls:
-                ld = xl * len(l) / lt; cues.append((c, c + ld, clean(l))); c += ld
+            ls = sub_lines(x, 16 if VERT else 22); heads.append(len(lines)); lines += ls
+        w = [len(re.sub(r"[，。,\.；;：:、！？!?「」“”]", "", l)) or 1 for l in lines]
+        cum = np.cumsum(w) / sum(w) * dl
+        sil = silences(scene_mp3)
+        edges = snap(list(cum[:-1]), [x for x in sil if 0.2 < x < dl - 0.2], 0.9)
+        b = [0.0] + edges + [dl]
+        for k, l in enumerate(lines): cues.append((t + b[k], t + b[k + 1], clean(l)))
+        sc["_starts"] = [t + b[h] for h in heads]
         chunks.append(a); t += dl
-        dur = t + tail_s; chunks.append(np.zeros(int(SR * tail_s), np.float32))
+        dur = t + scene_tail; chunks.append(np.zeros(int(SR * scene_tail), np.float32))
     elif voice_file:
         dur = float(sc["dur"])
         lines = [l for s in sentences(sc.get("narration", "")) for l in sub_lines(s, 16 if VERT else 22)]

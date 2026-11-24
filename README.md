@@ -7,6 +7,9 @@ Claude skill：把任何话题 / 文章 / 链接 / 文件做成约 2 分钟、�
 - `scripts/render.py` — 渲染器（与 SKILL.md 内嵌版本一致）
 - `examples/coffee_storyboard.json` — 样例分镜（咖啡为什么让你清醒）
 
+## 配音
+默认用 ElevenLabs 声音 `E3IuT6dcpXhUwXqAw9Or`（Dennis - Warm & Clear），通过 ElevenLabs 连接器按场景生成，下载到 `audio/01.mp3…`，分镜里设 `"audio_dir": "audio"`。不设 `audio_dir` 时用离线 sherpa-onnx 女声作后备。
+
 ## 用法
 ```bash
 pip install sherpa-onnx soundfile pillow numpy   # 另需 ffmpeg、Noto Sans CJK 字体

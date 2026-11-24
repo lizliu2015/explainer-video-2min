@@ -10,7 +10,7 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 ## 0. 默认参数（用户没说就用这些，不追问）
 - 画幅：竖屏 1080×1920（抖音/视频号/Shorts）。用户说 YouTube/横屏 → 1920×1080。
 - 语言：跟随输入；简繁跟随用户（繁体 `"script":"tc"`）。
-- 配音：内置离线 AI 女声（sherpa-onnx matcha-zh-baker）。用户给了配音文件 → 用 `voice_file`。
+- 配音：**必须用 ElevenLabs 声音 `E3IuT6dcpXhUwXqAw9Or`（Dennis - Warm & Clear，男声）**，流程见第 4 节。用户本次指定别的声音或给了配音文件（`voice_file`）时才换。
 - 主题色：`ink`（深蓝+金）/`paper`（米白+朱红）/`jade`（墨绿+金），按话题气质选。玄学/传统文化优先 `jade` 或 `paper`。
 - 时长目标 110–130 秒。
 
@@ -24,7 +24,8 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 - 材料太大装不进2分钟 → 只讲一个主线，其余放进脚本 md 的“未展开”清单，不硬塞。
 
 ## 2. 写口播稿（最关键）
-**字数**：实测本 TTS 在 speed 0.95 时约 230 字/分钟（含停顿）。2 分钟 = **440–480 个有效汉字**（不算标点）。超了就删，不要靠加速。
+**字数**：ElevenLabs Dennis 首次实测约 300 字/分钟（不含场景间停顿）。2 分钟 = **500–540 个有效汉字**（不算标点）。超了就删，不要靠加速。生成配音后以渲染器打印的 `TOTAL` 为准，只重做超长/过短的场景。
+- narration 里不要写 ElevenLabs 语气标签（如 `[excited]`）：字幕直接取自 narration，标签会出现在字幕里。
 
 **结构（6–8 个场景）**
 | 段 | 秒数 | 内容 | 常用版式 |
@@ -71,7 +72,22 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 - `cue`：该卡片在第几句口播（从0数）开始时出现；不写则按句子均匀分配。也可用 `at`（秒）。让画面和“第一、第二”同步。
 - 外部配音：设 `voice_file`，并给每个场景填 `dur`（秒），字幕按字数比例分配。
 
-## 4. 环境准备（每个新会话一次，约1分钟）
+## 4. 配音（ElevenLabs，声音 ID `E3IuT6dcpXhUwXqAw9Or`）
+固定用这个声音。ElevenLabs 不可用时停下告诉用户原因，**不要自行换成离线声音**；用户同意后才用下方离线后备。
+
+**工具**：ElevenLabs 连接器的 `creative_create_flow`、`creative_generate_speech`、`creative_get_flow_run_status`。不在工具列表里 → 先用 ToolSearch 搜 `ElevenLabs generate speech`；仍没有 → 请用户在 claude.ai 连接 ElevenLabs 连接器，然后开新对话。
+
+**流程**（稿子定稿后再做，每次生成都扣积分）：
+1. `creative_create_flow`（name = 视频标题）→ 记下 `flow_id`，本视频所有配音都放这个 flow。
+2. 每个场景调用一次 `creative_generate_speech`：`prompt` = 该场景 narration 全文，`voice_id` = `E3IuT6dcpXhUwXqAw9Or`，`model_id` = `eleven_v4`，`generations_count` = 1，`flow_id` = 上一步的。各场景可在同一轮并发发出。**绝不重复调用来重试**（会再扣一次）。
+3. 等约 10 秒，用 `creative_get_flow_run_status`（flow_id + 全部 session_ids）取每个生成的 `media[].url`，按 prompt 对应回场景。
+4. 下载：`curl -sS -o audio/01.mp3 "<url>"`（场景号两位数）。下载被拒（403 / CONNECT tunnel failed）→ 告诉用户：在 claude.ai 的 设置 → Capabilities 允许的域名里加上 `elevenlabsusercontent.com`，加好后再继续。不要换别的方式绕过。
+5. storyboard.json 加 `"audio_dir": "audio"`。渲染器读 `audio/<场景号>.mp3`，按字数比例对齐字幕和卡片（`cue` 仍然有效）。
+6. 改稿时只重新生成改动的场景，覆盖对应 mp3。
+
+**成本**：约 1 积分/字（实测 30 字 = 31 积分），2 分钟视频约 520–560 积分。
+
+### 离线后备（仅用户同意时；不设 `audio_dir` 即用离线女声）
 ```bash
 pip install --break-system-packages -q sherpa-onnx soundfile
 mkdir -p /tmp/tts && cd /tmp/tts
@@ -148,7 +164,13 @@ def tts_engine():
     return _tts
 
 SR = 22050
-def say(text, speed):
+AUDIO_DIR = SB.get("audio_dir")  # 预生成配音：<audio_dir>/<场景号>.mp3（整场景）或 <场景号>_<句号>.mp3（逐句）
+def say(text, speed, key=None):
+    if AUDIO_DIR:
+        fn = f"{AUDIO_DIR}/{key}.mp3"
+        if not os.path.exists(fn): sys.exit(f"缺少配音文件 {fn}")
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", fn, "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
+        return np.frombuffer(raw, dtype=np.float32).copy()
     a = tts_engine().generate(text, sid=0, speed=speed)
     x = np.asarray(a.samples, dtype=np.float32)
     if a.sample_rate != SR:  # 简单重采样
@@ -312,7 +334,20 @@ all_audio, plan, total = [], [], 0.0
 for si, sc in enumerate(SB["scenes"]):
     cues, t = [], 0.25 if si == 0 else 0.1
     chunks = [np.zeros(int(SR * t), np.float32)]
-    if voice_file:
+    scene_mp3 = f"{AUDIO_DIR}/{si+1:02d}.mp3" if AUDIO_DIR else None
+    if scene_mp3 and os.path.exists(scene_mp3):
+        # 整场景一段配音（ElevenLabs）：字幕/卡片按字数比例分配时间
+        a = say(None, speed, f"{si+1:02d}"); dl = len(a) / SR
+        sents = sentences(sc.get("narration", ""))
+        tot = sum(len(x) for x in sents) or 1; c = t; sc["_starts"] = []
+        for x in sents:
+            sc["_starts"].append(c)
+            ls = sub_lines(x, 16 if VERT else 22); xl = dl * len(x) / tot; lt = sum(len(l) for l in ls) or 1
+            for l in ls:
+                ld = xl * len(l) / lt; cues.append((c, c + ld, clean(l))); c += ld
+        chunks.append(a); t += dl
+        dur = t + tail_s; chunks.append(np.zeros(int(SR * tail_s), np.float32))
+    elif voice_file:
         dur = float(sc["dur"])
         lines = [l for s in sentences(sc.get("narration", "")) for l in sub_lines(s, 16 if VERT else 22)]
         tot = sum(len(l) for l in lines) or 1; cur = 0.1
@@ -320,9 +355,9 @@ for si, sc in enumerate(SB["scenes"]):
             dl = (dur - 0.3) * len(l) / tot; cues.append((cur, cur + dl, clean(l))); cur += dl
     else:
         sc["_starts"] = []
-        for s in sentences(sc.get("narration", "")):
+        for j, s in enumerate(sentences(sc.get("narration", ""))):
             sc["_starts"].append(t)
-            a = say(s, speed); dl = len(a) / SR
+            a = say(s, speed, f"{si+1:02d}_{j+1:02d}"); dl = len(a) / SR
             lines = sub_lines(s, 16 if VERT else 22); tot = sum(len(l) for l in lines)
             c = t
             for l in lines:

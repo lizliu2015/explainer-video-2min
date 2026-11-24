@@ -50,7 +50,13 @@ def tts_engine():
     return _tts
 
 SR = 22050
-def say(text, speed):
+AUDIO_DIR = SB.get("audio_dir")  # 预生成配音：<audio_dir>/<场景号>.mp3（整场景）或 <场景号>_<句号>.mp3（逐句）
+def say(text, speed, key=None):
+    if AUDIO_DIR:
+        fn = f"{AUDIO_DIR}/{key}.mp3"
+        if not os.path.exists(fn): sys.exit(f"缺少配音文件 {fn}")
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", fn, "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
+        return np.frombuffer(raw, dtype=np.float32).copy()
     a = tts_engine().generate(text, sid=0, speed=speed)
     x = np.asarray(a.samples, dtype=np.float32)
     if a.sample_rate != SR:  # 简单重采样
@@ -214,7 +220,20 @@ all_audio, plan, total = [], [], 0.0
 for si, sc in enumerate(SB["scenes"]):
     cues, t = [], 0.25 if si == 0 else 0.1
     chunks = [np.zeros(int(SR * t), np.float32)]
-    if voice_file:
+    scene_mp3 = f"{AUDIO_DIR}/{si+1:02d}.mp3" if AUDIO_DIR else None
+    if scene_mp3 and os.path.exists(scene_mp3):
+        # 整场景一段配音（ElevenLabs）：字幕/卡片按字数比例分配时间
+        a = say(None, speed, f"{si+1:02d}"); dl = len(a) / SR
+        sents = sentences(sc.get("narration", ""))
+        tot = sum(len(x) for x in sents) or 1; c = t; sc["_starts"] = []
+        for x in sents:
+            sc["_starts"].append(c)
+            ls = sub_lines(x, 16 if VERT else 22); xl = dl * len(x) / tot; lt = sum(len(l) for l in ls) or 1
+            for l in ls:
+                ld = xl * len(l) / lt; cues.append((c, c + ld, clean(l))); c += ld
+        chunks.append(a); t += dl
+        dur = t + tail_s; chunks.append(np.zeros(int(SR * tail_s), np.float32))
+    elif voice_file:
         dur = float(sc["dur"])
         lines = [l for s in sentences(sc.get("narration", "")) for l in sub_lines(s, 16 if VERT else 22)]
         tot = sum(len(l) for l in lines) or 1; cur = 0.1
@@ -222,9 +241,9 @@ for si, sc in enumerate(SB["scenes"]):
             dl = (dur - 0.3) * len(l) / tot; cues.append((cur, cur + dl, clean(l))); cur += dl
     else:
         sc["_starts"] = []
-        for s in sentences(sc.get("narration", "")):
+        for j, s in enumerate(sentences(sc.get("narration", ""))):
             sc["_starts"].append(t)
-            a = say(s, speed); dl = len(a) / SR
+            a = say(s, speed, f"{si+1:02d}_{j+1:02d}"); dl = len(a) / SR
             lines = sub_lines(s, 16 if VERT else 22); tot = sum(len(l) for l in lines)
             c = t
             for l in lines:

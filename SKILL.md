@@ -7,12 +7,14 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 
 输入：一个话题 / 一篇文章 / 链接 / 附件。输出：`<标题>.mp4`（约2:00）+ `<标题>_脚本.md`（逐场景口播稿+画面说明）。
 
+**标准**：要做的是让人看完、愿意转发的短视频，不是课件。三条硬指标：① 前 3 秒就出现冲突或反转；② 画面每 2–3 秒有一次变化；③ 至少一个原文没有的专业增量。交付前按第 5 节的自评清单打分，不达标就改。
+
 ## 0. 默认参数（用户没说就用这些，不追问）
 - 画幅：竖屏 1080×1920（抖音/视频号/Shorts）。用户说 YouTube/横屏 → 1920×1080。
 - 语言：跟随输入；简繁跟随用户（繁体 `"script":"tc"`）。
 - 配音：**必须用 ElevenLabs 声音 `E3IuT6dcpXhUwXqAw9Or`（Dennis - Warm & Clear，男声）**，流程见第 4 节。用户本次指定别的声音或给了配音文件（`voice_file`）时才换。
 - 主题色：`ink`（深蓝+金）/`paper`（米白+朱红）/`jade`（墨绿+金），按话题气质选。玄学/传统文化优先 `jade` 或 `paper`。
-- 时长目标 110–130 秒。
+- 时长目标 110–130 秒。人物/热点类题材，交付时提一句可另出 60–85 秒精华版（同一套配音，删场景即可）。
 
 ## 1. 吃透材料
 - 只给话题 → 先 WebSearch 3–6 次，取事实、数字、一个好例子；数字必须有出处，写进脚本 md 末尾“来源”。
@@ -21,6 +23,8 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
   1. **一句话核心**（≤25字，观众看完只记得住这一句）
   2. **最大误解/反常识点**（做开头钩子）
   3. **一个生活化比喻**（把抽象概念换成日常物件：钥匙和锁、水管、排队……）
+  4. **专业增量**：一个原文没讲、你自己复核出来的硬发现（命理类：空亡、合化成否、刑冲落在哪步大运流年；其他题材：新数据、反例、原文漏掉的变量）。这是视频的差异化核心，优先放进主线。
+- 原文带预测或有时效（旧文、“即将”“明年”）→ 先 WebSearch 查结果是否应验。应验与否通常就是最强钩子，放在开头，不要压到结尾。
 - 材料太大装不进2分钟 → 只讲一个主线，其余放进脚本 md 的“未展开”清单，不硬塞。
 
 ## 1.5 八字/命理类视频：专业排盘（话题涉及八字、四柱、大运、某人命盘时必做）
@@ -34,26 +38,30 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
   - 子时流派默认 `--sect 2`（晚子时日柱不换日），23–24 点出生的要在 md 里说明用的是哪派。
   - 时辰不详时用 `--no-hour`，只排三柱，时柱显示“不详”。原文自己推出来的时辰，在 heading 或口播里说明是“推定时辰”。
   - 有生年争议的，每个版本各排一张命盘。
+  - 复算后必查：日空落在哪些柱、哪几步大运；大运/流年与日支（夫妻宫）的刑冲合；合是否成化。原文没提、但能解释结果的，就是专业增量。
 - **分镜**：至少放一个 `bazi` 命盘场景，原文讲大运时再放一个 `dayun` 场景，代替纯文字卡片。用 `hl` 跟着口播圈出被讲到的字（透干、合冲、空亡等）：
   - `bazi`：`"hl":[{"cells":[[1,"天干"],[3,"天干"]],"label":"偏印双透","cue":1}]`（列号 0 年、1 月、2 日、3 时；行可选 `柱`/`十神`/`天干`/`地支`/`藏干`）。圈注框画在格子上，标签排成表下一行的药丸，不压盘面。
   - `dayun`：`"hl":[{"i":2,"label":"嫁蒋","cue":0}]`（i 是第几步大运，从 0 数）。
   - 命盘场景不受“屏幕文字≤12字”的限制，但 heading 要短，比如“1898年 坤造”。
+  - 面向大众默认加 `"compact": true`（只留柱/十神/天干/地支四行，字更大；藏干、纳音、长生写进脚本 md）。面向内行再用完整盘。
+  - 带 `hl` 的命盘/大运场景会自动推镜到被圈的格子；不需要时设 `"zoom": false`。
+  - 口播讲到谁的大运，画面上就要有谁的大运：两人都讲就做两个 `dayun` 场景，或把另一人的换运做成 `timeline`。
 - **口播**：干支照字读（“戊戌年，甲寅月”）。术语第一次出现时用一句大白话带过，比如“偏印就是生你、护你的那股力量”。合冲刑害要说清是哪两个字，比如“丙辛合，寅亥合”。
 - 涉及真实人物的争议史料（贪腐、政治指控等），与命理主线无关的放进“未展开”，不进口播。
 
 ## 2. 写口播稿（最关键）
-**字数**：ElevenLabs Dennis 首次实测约 300 字/分钟（不含场景间停顿）。2 分钟 = **500–540 个有效汉字**（不算标点）。超了就删，不要靠加速。生成配音后以渲染器打印的 `TOTAL` 为准，只重做超长/过短的场景。
+**字数**：ElevenLabs Dennis 实测原始约 230 字/分钟；渲染器压缩长停顿（`squeeze`）后约 245 字/分钟（511 字配音约 125 秒）。再加上每场景约 1 秒的 `scene_tail`，2 分钟 = **430–470 个有效汉字**（不算标点）。超了就删，不要靠加速。生成配音后以渲染器打印的 `TOTAL` 为准，只重做超长/过短的场景。
 - narration 里不要写 ElevenLabs 语气标签（如 `[excited]`）：字幕直接取自 narration，标签会出现在字幕里。
 
 **结构（6–8 个场景）**
 | 段 | 秒数 | 内容 | 常用版式 |
 |---|---|---|---|
-| 钩子 | 0–10 | 反常识 / 提问 / 结果前置，第一句就抛冲突；第二句预告“两分钟讲清楚” | hook |
+| 钩子 | 0–10 | **结果/反转前置**：第一句就抛冲突（如“三年前断言必结婚，结果没有”），配 `stamp` 印章在 3 秒内盖下；第二句预告“两分钟讲清楚” | hook |
 | 定义 | 10–25 | 关键概念 + 比喻 | big |
 | 机制 | 25–70 | 2–3 个要点，或因果步骤 | list / steps / compare |
 | 例子/应用 | 70–100 | 一个具体场景，解释开头的现象 | steps / compare |
 | 金句 | 100–110 | 一句话核心的口语版 | big |
-| 总结 | 110–125 | 重复核心 + 一句可行动的建议或余味 | end |
+| 总结 | 110–125 | 重复核心 + 回扣开头的钩子 + 一个留给评论区的问题 | end |
 
 **易懂规则**
 - 每句 ≤20 字，口语，能大声念顺。多用“你”。
@@ -94,6 +102,11 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 - 屏幕文字是**关键词，不是字幕**：heading ≤12字，卡片 title ≤6字、text ≤14字。`\n` 手动换行。
 - `cue`：该卡片在第几句口播（从0数）开始时出现；不写则按句子均匀分配。也可用 `at`（秒）。让画面和“第一、第二”同步。
 - 外部配音：设 `voice_file`，并给每个场景填 `dur`（秒），字幕按字数比例分配。
+- `timeline` 版式：`"items":[{"year":"2023","text":"命理师断言","cue":0},…]`，竖向时间轴逐条弹出，≤4 条。讲“预测 vs 现实”、事件经过、年表时用它，不要用两张空卡的 compare。
+- `stamp`（任何场景都可加）：`{"text":"落空","cue":1,"x":0.68,"y":0.47,"rot":12}`，第 cue 句时盖下一个印章，用于判词、反转、结论。
+- 全局 `"squeeze": 0.26`（默认值）：配音里超过 0.26 秒的停顿压到 0.26 秒；设 `null` 关闭。
+- **画面节奏**：每 2–3 秒要有一次变化（cue 出卡、hl 圈注、stamp、推镜）。单场景超过 15 秒就拆，或至少排 4 个 cue。口播提到的人、盘、事件，画面上必须有对应元素。卡片不要大片留白。
+- 真人明星的照片不放进视频，用名字大字排版或相关符号代替；用户有授权素材时由用户自行加入。
 
 ## 4. 配音（ElevenLabs，声音 ID `E3IuT6dcpXhUwXqAw9Or`）
 固定用这个声音。ElevenLabs 不可用时停下告诉用户原因，**不要自行换成离线声音**；用户同意后才用下方离线后备。
@@ -108,12 +121,12 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
 **流程**（每次生成都扣积分）：
 1. `creative_create_flow`（name = 视频标题）→ 记下 `flow_id`，本视频所有配音都放这个 flow。
 2. 每个场景调用一次 `creative_generate_speech`：`prompt` = 该场景 narration 全文，`voice_id` = `E3IuT6dcpXhUwXqAw9Or`，`model_id` = `eleven_v4`，`generations_count` = 1，`flow_id` = 上一步的。各场景可在同一轮并发发出。**绝不重复调用来重试**（会再扣一次）。
-3. 等约 10 秒，用 `creative_get_flow_run_status`（flow_id + 全部 session_ids）取每个生成的 `media[].url`，按 prompt 对应回场景。
+3. 等约 15 秒，用 `creative_get_flow_run_status`（flow_id + 全部 session_ids）取每个生成的 `media[].url`，按 prompt 对应回场景。先下载已完成的；还在 generating 的，只用那几个 session_id 再查一次。
 4. 下载：`curl -sS -o audio/01.mp3 "<url>"`（场景号两位数）。下载被拒（403 / CONNECT tunnel failed）→ 告诉用户：在 claude.ai 的 设置 → Capabilities 允许的域名里加上 `elevenlabsusercontent.com`，加好后再继续。不要换别的方式绕过。
 5. storyboard.json 加 `"audio_dir": "audio"`。渲染器读 `audio/<场景号>.mp3`，先按字数估算字幕边界，再自动吸附到配音里的真实停顿（实测误差约 0.03 秒）；卡片按 `cue` 在对应句子开口时出现。
 6. 改稿时只重新生成改动的场景，覆盖对应 mp3。
 
-**成本**：约 1 积分/字（实测 30 字 = 31 积分），2 分钟视频约 520–560 积分。
+**成本**：约 1.2 积分/字（实测 511 字 = 610 积分），2 分钟视频约 550–600 积分。**先用静音占位预览版式**（第 5 节第 0 步），确认画面没问题再花积分。
 
 ### 离线后备（仅用户同意时；不设 `audio_dir` 即用离线女声）
 ```bash
@@ -126,16 +139,35 @@ mkdir -p /tmp/tts && cd /tmp/tts
 
 ## 5. 渲染
 把下方 `render.py` 原样写入工作目录（八字类再写入 `bazi.py`），然后：
+0. **配音前的免费预览**：按字数生成静音占位 mp3，跑 PREVIEW 检查版式，再生成真配音覆盖：
+```bash
+mkdir -p audio && python3 - <<'EOF'
+import json, re, subprocess
+sb = json.load(open("storyboard.json"))
+for i, s in enumerate(sb["scenes"]):
+    n = len(re.sub(r"[，。？！：；、\s]", "", s["narration"]))
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono", "-t", str(n / 4.1), f"audio/{i+1:02d}.mp3"], check=True)
+EOF
+```
 1. **先预览**：`PREVIEW=1 python3 render.py storyboard.json out.mp4` → 生成配音、打印每场景秒数和 `TOTAL`，输出 `_build/preview_XX.png`（每场景 85% 时刻的满屏帧）。
    - `TOTAL` 不在 110–130s → 改稿（增删字），不要改 speed 超出 0.85–1.05。
    - 拼一张缩略总览看：`ffmpeg -i _build/preview_%02d.png -vf "scale=360:-1,tile=4x2" sheet.png`，用 Read 检查：文字溢出、卡片挤、字幕遮挡、空场景。
 2. **全量渲染**：`python3 render.py storyboard.json <标题>.mp4`（2分钟竖屏约1分钟）。
 3. 只改某场景画面：`ONLY=3,5 python3 render.py …`（其他场景复用已有片段）。改了 narration 则全量重跑。
 4. 抽 2–3 帧（`ffmpeg -ss <秒> -i out.mp4 -frames:v 1 f.png`）在元素最多的时刻复查，`ffprobe` 确认时长。
+5. **自评（交付前必做）**：`ffmpeg -i out.mp4 -vf "fps=1/4,scale=270:-1,tile=8x4" -frames:v 1 review.png` 看全片，再单看 0.3 / 1 / 2.5 秒三帧。逐条检查，任一不过就改稿或改分镜：
+   - 前 3 秒画面里有没有冲突/反转（大字判词、印章），而不是静态标题卡？
+   - 有没有连续两张缩略帧（8 秒）几乎一样？有就加 cue 或拆场景。
+   - 口播在讲的人、盘、事件，画面上有没有？
+   - 卡片有没有大片留白？命盘小字在手机上能不能看清？
+   - 字幕是否避开了底部平台遮挡区？
+   - 有没有原文之外的专业增量？结尾有没有回扣钩子、抛出评论区问题？
+   回复里给出 10 分制自评分和没解决的短板，不要只说“做好了”。
 
 ## 6. 交付
 - SendUserFile 发 mp4 + `<标题>_脚本.md`（场景表：时间码 / 口播 / 屏幕文字 / 来源）。
-- 回复里只说：时长、一句话核心、可调项（换声音/横屏/主题色/加BGM）。
+- 回复里只说：时长、一句话核心、自评分与短板、可调项（换声音/横屏/主题色/加BGM/精华版）。
+- 用户要发布文案时：X 单条 ≤280 加权字符（中文每字算 2，用脚本算准）+ 3–4 条串推版，标明视频挂在哪条。X 原生视频上限 2:20。
 - 用户要改：改稿 → 只重渲受影响场景。
 
 ## render.py
@@ -198,7 +230,9 @@ def say(text, speed, key=None):
         fn = f"{AUDIO_DIR}/{key}.mp3"
         if not os.path.exists(fn): sys.exit(f"缺少配音文件 {fn}")
         raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", fn, "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
-        return np.frombuffer(raw, dtype=np.float32).copy()
+        x = np.frombuffer(raw, dtype=np.float32).copy()
+        g = SB.get("squeeze", 0.26)
+        return squeeze(x, g) if g else x
     a = tts_engine().generate(text, sid=0, speed=speed)
     x = np.asarray(a.samples, dtype=np.float32)
     if a.sample_rate != SR:  # 简单重采样
@@ -224,6 +258,21 @@ def snap(expected, sil, win):
         if best is not None: used.add(best)
         out.append(v); last = v
     return out
+
+def squeeze(x, maxgap=0.26, edge=0.06, db=-45):
+    """压缩配音里的长停顿：句中静音>maxgap秒缩到maxgap，首尾只留edge秒（ElevenLabs 停顿偏长，约省5%时长）"""
+    fr = int(SR * 0.02); n = len(x) // fr
+    if n == 0: return x
+    q = 20 * np.log10(np.sqrt((x[:n * fr].reshape(n, fr) ** 2).mean(1) + 1e-12)) < db
+    keep = np.ones(n, bool); i = 0
+    while i < n:
+        if not q[i]: i += 1; continue
+        j = i
+        while j < n and q[j]: j += 1
+        lim = int((edge if i == 0 or j == n else maxgap) / 0.02)
+        if j - i > lim: s0 = i + lim // 2; keep[s0:s0 + j - i - lim] = False
+        i = j
+    return x[:n * fr].reshape(n, fr)[keep].ravel()
 
 def sentences(t):
     parts = re.findall(r"[^。！？!?]+[。！？!?」”]*", t.strip())
@@ -283,7 +332,7 @@ def blend(c, base, a): return tuple(int(base[i] + (c[i] - base[i]) * a) for i in
 # ---------- 版式 ----------
 M = int(80 * S)  # 边距
 TOP = int((260 if VERT else 90) * S)
-SUB_Y = H - int((430 if VERT else 150) * S)  # 字幕区顶
+SUB_Y = H - int((660 if VERT else 150) * S)  # 字幕区顶（竖屏上移到约2/3处，避开抖音/视频号底部文案和按钮）
 
 # ---------- 八字命盘 / 大运 ----------
 WX = {}
@@ -313,6 +362,8 @@ def draw_bazi(sc, t, img):
     y = TOP + hh + 50 * S
     lw = 120 * S; cw = (W - 2 * M - lw) / len(cols)
     rows = [("", 64), ("十神", 64), ("天干", 150), ("地支", 150), ("藏干", 168), ("纳音", 62), ("长生", 62)]
+    BIG = 118
+    if sc.get("compact"): rows = [("", 70), ("十神", 76), ("天干", 210), ("地支", 210)]; BIG = 170  # 大众向：只留四行，字放大
     top = y; ys = {}
     for name, h in rows: ys[name or "柱"] = (y, y + h * S); y += h * S
     d.rounded_rectangle([M - 10 * S, top - 10 * S, W - M + 10 * S, y + 10 * S], radius=int(24 * S), fill=blend(T["card"], base, k_head))
@@ -331,8 +382,9 @@ def draw_bazi(sc, t, img):
             d.text((cx - tw / 2, (y0 + y1) / 2 - f.size * 0.62), s, font=f, fill=blend(col, T["card"], k))
         ctext("柱", c["name"], font(38), T["sub"])
         ctext("十神", c["ss"], font(40), T["acc"] if c["ss"] == "日主" else T["fg"])
-        ctext("天干", c["gan"], font(118), wx(c["gan"]))
-        ctext("地支", c["zhi"], font(118), wx(c["zhi"]))
+        ctext("天干", c["gan"], font(BIG), wx(c["gan"]))
+        ctext("地支", c["zhi"], font(BIG), wx(c["zhi"]))
+        if "藏干" not in ys: continue
         y0, y1 = ys["藏干"]; f = font(36, False); n = max(1, len(c["hide"]))
         for j, (hg, hs) in enumerate(c["hide"]):
             yy = y0 + (y1 - y0) * (j + 0.5) / 3 - f.size * 0.62 + (3 - n) * (y1 - y0) / 6
@@ -341,6 +393,7 @@ def draw_bazi(sc, t, img):
             d.text((xx, yy), s1, font=font(36), fill=blend(wx(hg), T["card"], k)); d.text((xx + w1 + 8 * S, yy), s2, font=f, fill=blend(T["sub"], T["card"], k))
         ctext("纳音", c["nayin"], font(34, False), T["sub"])
         ctext("长生", c["dishi"], font(34, False), T["sub"])
+    sc["_cells"] = cell
     ny = y + 40 * S
     for line in ch.get("notes", []):
         ny += text_block(d, (W / 2, ny), line, font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base) + 6 * S
@@ -378,6 +431,7 @@ def draw_dayun(sc, t, img):
     if sc.get("note"):
         rows = (len(dy) + per - 1) // per
         text_block(d, (W / 2, y0 + rows * (bh + 110 * S) - 40 * S), sc["note"], font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base)
+    sc["_boxes"] = boxes
     for h in sc.get("hl", []):
         if h["i"] < len(boxes): hl_box(d, boxes[h["i"]], ease((t - cue_time(sc, h.get("cue", 0))) / 0.4), h.get("label"))
 
@@ -427,6 +481,17 @@ def draw_scene(sc, t, dur, img):
             text_block(d, (x0 + cw / 2, yy + 50 * S), it.get("title", ""), font(56), blend(T["acc"], T["card"], k), cw - 60 * S)
             text_block(d, (x0 + cw / 2, yy + 160 * S), it.get("text", ""), font(50, False), blend(T["fg"], T["card"], k), cw - 60 * S, lh=1.45)
         return
+    if lay == "timeline":  # items: [{"year":"2023","text":"…","cue":0}]，竖向时间轴逐条弹出
+        step = min(avail / n, 230 * S); lx = M + 150 * S
+        for i, it in enumerate(items):
+            k = ease((t - ats[i]) / 0.45)
+            if k <= 0: continue
+            yy = y0 + i * step + (1 - k) * 30 * S; dc = yy + 30 * S
+            if i: d.line([lx, y0 + (i - 1) * step + 30 * S, lx, dc], fill=blend(T["acc"], base, k), width=max(2, int(5 * S)))
+            r = 16 * S; d.ellipse([lx - r, dc - r, lx + r, dc + r], fill=blend(T["acc"], base, k))
+            fy = font(46); yt = str(it.get("year", "")); d.text((lx - 36 * S - d.textlength(yt, font=fy), yy), yt, font=fy, fill=blend(T["acc"], base, k))
+            text_block(d, (lx + 46 * S, yy), it.get("text", ""), font(48, False), T["fg"], W - M - lx - 46 * S, align="left", alpha=k, base=base)
+        return
     gap = 28 * S
     ch = min((avail - gap * (n - 1)) / n, 300 * S)
     for i, it in enumerate(items):
@@ -452,6 +517,38 @@ def draw_scene(sc, t, dur, img):
         for l in bl: d.text((tx, ty), l, font=fb, fill=blend(T["sub"], T["card"], k)); ty += fb.size * 1.4
         if lay == "steps" and i < n - 1 and k > 0.9:
             ax = cx; d.polygon([(ax - 16 * S, yy + ch + 4 * S), (ax + 16 * S, yy + ch + 4 * S), (ax, yy + ch + gap - 2 * S)], fill=T["acc"])
+
+def draw_stamp(sc, t, img):
+    """印章 {"text":"落空","cue":1,"x":0.68,"y":0.47,"rot":12,"size":64}：第cue句时从大到小“盖”下，用于判词/反转"""
+    st = sc.get("stamp")
+    if not st: return
+    k = ease((t - cue_time(sc, st.get("cue", 0))) / 0.25)
+    if k <= 0: return
+    f = font(int(st.get("size", 64) * (1 + 0.8 * (1 - k)))); pad = int(26 * S)
+    tw = ImageDraw.Draw(img).textlength(st["text"], font=f); bw, bh = int(tw + 2 * pad), int(f.size * 1.3 + pad)
+    layer = Image.new("RGBA", (bw + 12, bh + 12), (0, 0, 0, 0)); d = ImageDraw.Draw(layer); col = T["acc"] + (int(235 * k),)
+    d.rounded_rectangle([6, 6, bw + 6, bh + 6], radius=int(16 * S), outline=col, width=max(3, int(9 * S)))
+    d.text(((bw + 12) / 2, (bh + 12) / 2), st["text"], font=f, fill=col, anchor="mm")
+    layer = layer.rotate(st.get("rot", 12), expand=True, resample=Image.BICUBIC)
+    img.paste(layer, (int(W * st.get("x", 0.68) - layer.width / 2), int(H * st.get("y", 0.47) - layer.height / 2)), layer)
+
+def camera(img, sc, t, dur):
+    """镜头：整场景缓慢推近；bazi/dayun 的 hl 出现时推近到被圈格子停约2.5秒再拉回。场景设 "zoom": false 关闭"""
+    if sc.get("zoom") is False: return img
+    z = 1 + 0.035 * t / max(dur, 1); cx, cy = W / 2, H * 0.42; foc = None
+    for h in sc.get("hl", []):
+        tc = cue_time(sc, h.get("cue", 0))
+        if t < tc: continue
+        if "cells" in h and sc.get("_cells"): bs = [sc["_cells"][(ci, rn)] for ci, rn in h["cells"]]
+        elif "i" in h and h["i"] < len(sc.get("_boxes", [])): bs = [sc["_boxes"][h["i"]]]
+        else: continue
+        foc = (tc, (min(b[0] for b in bs) + max(b[2] for b in bs)) / 2, (min(b[1] for b in bs) + max(b[3] for b in bs)) / 2)
+    if foc:
+        k = ease((t - foc[0]) / 0.6) * (1 - ease((t - foc[0] - 2.5) / 0.6))
+        z += 0.2 * k; cx += (foc[1] - cx) * k * 0.6; cy += (foc[2] - cy) * k * 0.6
+    if z <= 1.001: return img
+    w, h = W / z, H / z; x0 = min(max(cx - w / 2, 0), W - w); y0 = min(max(cy - h / 2, 0), H - h)
+    return img.resize((W, H), Image.BICUBIC, box=(x0, y0, x0 + w, y0 + h))
 
 def draw_sub(img, line):
     if not line: return
@@ -492,7 +589,7 @@ for si, sc in enumerate(SB["scenes"]):
             ls = sub_lines(x, 16 if VERT else 22); heads.append(len(lines)); lines += ls
         w = [len(re.sub(r"[，。,\.；;：:、！？!?「」“”]", "", l)) or 1 for l in lines]
         cum = np.cumsum(w) / sum(w) * dl
-        sil = silences(scene_mp3)
+        sq = f"{WORK}/sq_{si+1:02d}.wav"; sf.write(sq, a, SR); sil = silences(sq)  # 在压缩后的音频上找停顿
         edges = snap(list(cum[:-1]), [x for x in sil if 0.2 < x < dl - 0.2], 0.9)
         b = [0.0] + edges + [dl]
         for k, l in enumerate(lines): cues.append((t + b[k], t + b[k + 1], clean(l)))
@@ -530,7 +627,7 @@ files = []
 for si, (sc, dur, cues, t0) in enumerate(plan):
     fn = f"{WORK}/s{si+1:02d}.mp4"; files.append(fn)
     if preview:
-        t = dur * 0.85; img = BG.copy(); draw_scene(sc, t, dur, img)
+        t = dur * 0.85; img = BG.copy(); draw_scene(sc, t, dur, img); draw_stamp(sc, t, img); img = camera(img, sc, t, dur)
         draw_sub(img, next((c[2] for c in cues if c[0] <= t < c[1]), cues[-1][2] if cues else "")); progress(img, (t0 + t) / total)
         img.save(f"{WORK}/preview_{si+1:02d}.png"); continue
     if only and (si + 1) not in only and os.path.exists(fn): continue
@@ -539,7 +636,7 @@ for si, (sc, dur, cues, t0) in enumerate(plan):
                           "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", tmp], stdin=subprocess.PIPE)
     nf = int(round(dur * FPS))
     for fi in range(nf):
-        t = fi / FPS; img = BG.copy(); draw_scene(sc, t, dur, img)
+        t = fi / FPS; img = BG.copy(); draw_scene(sc, t, dur, img); draw_stamp(sc, t, img); img = camera(img, sc, t, dur)
         draw_sub(img, next((c[2] for c in cues if c[0] <= t < c[1]), ""))
         progress(img, (t0 + t) / total)
         if t > dur - 0.2: img = Image.blend(img, BG, (t - (dur - 0.2)) / 0.2 * 0.6)

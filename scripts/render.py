@@ -56,7 +56,9 @@ def say(text, speed, key=None):
         fn = f"{AUDIO_DIR}/{key}.mp3"
         if not os.path.exists(fn): sys.exit(f"缺少配音文件 {fn}")
         raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", fn, "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
-        return np.frombuffer(raw, dtype=np.float32).copy()
+        x = np.frombuffer(raw, dtype=np.float32).copy()
+        g = SB.get("squeeze", 0.26)
+        return squeeze(x, g) if g else x
     a = tts_engine().generate(text, sid=0, speed=speed)
     x = np.asarray(a.samples, dtype=np.float32)
     if a.sample_rate != SR:  # 简单重采样
@@ -82,6 +84,21 @@ def snap(expected, sil, win):
         if best is not None: used.add(best)
         out.append(v); last = v
     return out
+
+def squeeze(x, maxgap=0.26, edge=0.06, db=-45):
+    """压缩配音里的长停顿：句中静音>maxgap秒缩到maxgap，首尾只留edge秒（ElevenLabs 停顿偏长，约省5%时长）"""
+    fr = int(SR * 0.02); n = len(x) // fr
+    if n == 0: return x
+    q = 20 * np.log10(np.sqrt((x[:n * fr].reshape(n, fr) ** 2).mean(1) + 1e-12)) < db
+    keep = np.ones(n, bool); i = 0
+    while i < n:
+        if not q[i]: i += 1; continue
+        j = i
+        while j < n and q[j]: j += 1
+        lim = int((edge if i == 0 or j == n else maxgap) / 0.02)
+        if j - i > lim: s0 = i + lim // 2; keep[s0:s0 + j - i - lim] = False
+        i = j
+    return x[:n * fr].reshape(n, fr)[keep].ravel()
 
 def sentences(t):
     parts = re.findall(r"[^。！？!?]+[。！？!?」”]*", t.strip())
@@ -141,7 +158,7 @@ def blend(c, base, a): return tuple(int(base[i] + (c[i] - base[i]) * a) for i in
 # ---------- 版式 ----------
 M = int(80 * S)  # 边距
 TOP = int((260 if VERT else 90) * S)
-SUB_Y = H - int((430 if VERT else 150) * S)  # 字幕区顶
+SUB_Y = H - int((660 if VERT else 150) * S)  # 字幕区顶（竖屏上移到约2/3处，避开抖音/视频号底部文案和按钮）
 
 # ---------- 八字命盘 / 大运 ----------
 WX = {}
@@ -171,6 +188,8 @@ def draw_bazi(sc, t, img):
     y = TOP + hh + 50 * S
     lw = 120 * S; cw = (W - 2 * M - lw) / len(cols)
     rows = [("", 64), ("十神", 64), ("天干", 150), ("地支", 150), ("藏干", 168), ("纳音", 62), ("长生", 62)]
+    BIG = 118
+    if sc.get("compact"): rows = [("", 70), ("十神", 76), ("天干", 210), ("地支", 210)]; BIG = 170  # 大众向：只留四行，字放大
     top = y; ys = {}
     for name, h in rows: ys[name or "柱"] = (y, y + h * S); y += h * S
     d.rounded_rectangle([M - 10 * S, top - 10 * S, W - M + 10 * S, y + 10 * S], radius=int(24 * S), fill=blend(T["card"], base, k_head))
@@ -189,8 +208,9 @@ def draw_bazi(sc, t, img):
             d.text((cx - tw / 2, (y0 + y1) / 2 - f.size * 0.62), s, font=f, fill=blend(col, T["card"], k))
         ctext("柱", c["name"], font(38), T["sub"])
         ctext("十神", c["ss"], font(40), T["acc"] if c["ss"] == "日主" else T["fg"])
-        ctext("天干", c["gan"], font(118), wx(c["gan"]))
-        ctext("地支", c["zhi"], font(118), wx(c["zhi"]))
+        ctext("天干", c["gan"], font(BIG), wx(c["gan"]))
+        ctext("地支", c["zhi"], font(BIG), wx(c["zhi"]))
+        if "藏干" not in ys: continue
         y0, y1 = ys["藏干"]; f = font(36, False); n = max(1, len(c["hide"]))
         for j, (hg, hs) in enumerate(c["hide"]):
             yy = y0 + (y1 - y0) * (j + 0.5) / 3 - f.size * 0.62 + (3 - n) * (y1 - y0) / 6
@@ -199,6 +219,7 @@ def draw_bazi(sc, t, img):
             d.text((xx, yy), s1, font=font(36), fill=blend(wx(hg), T["card"], k)); d.text((xx + w1 + 8 * S, yy), s2, font=f, fill=blend(T["sub"], T["card"], k))
         ctext("纳音", c["nayin"], font(34, False), T["sub"])
         ctext("长生", c["dishi"], font(34, False), T["sub"])
+    sc["_cells"] = cell
     ny = y + 40 * S
     for line in ch.get("notes", []):
         ny += text_block(d, (W / 2, ny), line, font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base) + 6 * S
@@ -236,6 +257,7 @@ def draw_dayun(sc, t, img):
     if sc.get("note"):
         rows = (len(dy) + per - 1) // per
         text_block(d, (W / 2, y0 + rows * (bh + 110 * S) - 40 * S), sc["note"], font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base)
+    sc["_boxes"] = boxes
     for h in sc.get("hl", []):
         if h["i"] < len(boxes): hl_box(d, boxes[h["i"]], ease((t - cue_time(sc, h.get("cue", 0))) / 0.4), h.get("label"))
 
@@ -285,6 +307,17 @@ def draw_scene(sc, t, dur, img):
             text_block(d, (x0 + cw / 2, yy + 50 * S), it.get("title", ""), font(56), blend(T["acc"], T["card"], k), cw - 60 * S)
             text_block(d, (x0 + cw / 2, yy + 160 * S), it.get("text", ""), font(50, False), blend(T["fg"], T["card"], k), cw - 60 * S, lh=1.45)
         return
+    if lay == "timeline":  # items: [{"year":"2023","text":"…","cue":0}]，竖向时间轴逐条弹出
+        step = min(avail / n, 230 * S); lx = M + 150 * S
+        for i, it in enumerate(items):
+            k = ease((t - ats[i]) / 0.45)
+            if k <= 0: continue
+            yy = y0 + i * step + (1 - k) * 30 * S; dc = yy + 30 * S
+            if i: d.line([lx, y0 + (i - 1) * step + 30 * S, lx, dc], fill=blend(T["acc"], base, k), width=max(2, int(5 * S)))
+            r = 16 * S; d.ellipse([lx - r, dc - r, lx + r, dc + r], fill=blend(T["acc"], base, k))
+            fy = font(46); yt = str(it.get("year", "")); d.text((lx - 36 * S - d.textlength(yt, font=fy), yy), yt, font=fy, fill=blend(T["acc"], base, k))
+            text_block(d, (lx + 46 * S, yy), it.get("text", ""), font(48, False), T["fg"], W - M - lx - 46 * S, align="left", alpha=k, base=base)
+        return
     gap = 28 * S
     ch = min((avail - gap * (n - 1)) / n, 300 * S)
     for i, it in enumerate(items):
@@ -310,6 +343,38 @@ def draw_scene(sc, t, dur, img):
         for l in bl: d.text((tx, ty), l, font=fb, fill=blend(T["sub"], T["card"], k)); ty += fb.size * 1.4
         if lay == "steps" and i < n - 1 and k > 0.9:
             ax = cx; d.polygon([(ax - 16 * S, yy + ch + 4 * S), (ax + 16 * S, yy + ch + 4 * S), (ax, yy + ch + gap - 2 * S)], fill=T["acc"])
+
+def draw_stamp(sc, t, img):
+    """印章 {"text":"落空","cue":1,"x":0.68,"y":0.47,"rot":12,"size":64}：第cue句时从大到小“盖”下，用于判词/反转"""
+    st = sc.get("stamp")
+    if not st: return
+    k = ease((t - cue_time(sc, st.get("cue", 0))) / 0.25)
+    if k <= 0: return
+    f = font(int(st.get("size", 64) * (1 + 0.8 * (1 - k)))); pad = int(26 * S)
+    tw = ImageDraw.Draw(img).textlength(st["text"], font=f); bw, bh = int(tw + 2 * pad), int(f.size * 1.3 + pad)
+    layer = Image.new("RGBA", (bw + 12, bh + 12), (0, 0, 0, 0)); d = ImageDraw.Draw(layer); col = T["acc"] + (int(235 * k),)
+    d.rounded_rectangle([6, 6, bw + 6, bh + 6], radius=int(16 * S), outline=col, width=max(3, int(9 * S)))
+    d.text(((bw + 12) / 2, (bh + 12) / 2), st["text"], font=f, fill=col, anchor="mm")
+    layer = layer.rotate(st.get("rot", 12), expand=True, resample=Image.BICUBIC)
+    img.paste(layer, (int(W * st.get("x", 0.68) - layer.width / 2), int(H * st.get("y", 0.47) - layer.height / 2)), layer)
+
+def camera(img, sc, t, dur):
+    """镜头：整场景缓慢推近；bazi/dayun 的 hl 出现时推近到被圈格子停约2.5秒再拉回。场景设 "zoom": false 关闭"""
+    if sc.get("zoom") is False: return img
+    z = 1 + 0.035 * t / max(dur, 1); cx, cy = W / 2, H * 0.42; foc = None
+    for h in sc.get("hl", []):
+        tc = cue_time(sc, h.get("cue", 0))
+        if t < tc: continue
+        if "cells" in h and sc.get("_cells"): bs = [sc["_cells"][(ci, rn)] for ci, rn in h["cells"]]
+        elif "i" in h and h["i"] < len(sc.get("_boxes", [])): bs = [sc["_boxes"][h["i"]]]
+        else: continue
+        foc = (tc, (min(b[0] for b in bs) + max(b[2] for b in bs)) / 2, (min(b[1] for b in bs) + max(b[3] for b in bs)) / 2)
+    if foc:
+        k = ease((t - foc[0]) / 0.6) * (1 - ease((t - foc[0] - 2.5) / 0.6))
+        z += 0.2 * k; cx += (foc[1] - cx) * k * 0.6; cy += (foc[2] - cy) * k * 0.6
+    if z <= 1.001: return img
+    w, h = W / z, H / z; x0 = min(max(cx - w / 2, 0), W - w); y0 = min(max(cy - h / 2, 0), H - h)
+    return img.resize((W, H), Image.BICUBIC, box=(x0, y0, x0 + w, y0 + h))
 
 def draw_sub(img, line):
     if not line: return
@@ -350,7 +415,7 @@ for si, sc in enumerate(SB["scenes"]):
             ls = sub_lines(x, 16 if VERT else 22); heads.append(len(lines)); lines += ls
         w = [len(re.sub(r"[，。,\.；;：:、！？!?「」“”]", "", l)) or 1 for l in lines]
         cum = np.cumsum(w) / sum(w) * dl
-        sil = silences(scene_mp3)
+        sq = f"{WORK}/sq_{si+1:02d}.wav"; sf.write(sq, a, SR); sil = silences(sq)  # 在压缩后的音频上找停顿
         edges = snap(list(cum[:-1]), [x for x in sil if 0.2 < x < dl - 0.2], 0.9)
         b = [0.0] + edges + [dl]
         for k, l in enumerate(lines): cues.append((t + b[k], t + b[k + 1], clean(l)))
@@ -388,7 +453,7 @@ files = []
 for si, (sc, dur, cues, t0) in enumerate(plan):
     fn = f"{WORK}/s{si+1:02d}.mp4"; files.append(fn)
     if preview:
-        t = dur * 0.85; img = BG.copy(); draw_scene(sc, t, dur, img)
+        t = dur * 0.85; img = BG.copy(); draw_scene(sc, t, dur, img); draw_stamp(sc, t, img); img = camera(img, sc, t, dur)
         draw_sub(img, next((c[2] for c in cues if c[0] <= t < c[1]), cues[-1][2] if cues else "")); progress(img, (t0 + t) / total)
         img.save(f"{WORK}/preview_{si+1:02d}.png"); continue
     if only and (si + 1) not in only and os.path.exists(fn): continue
@@ -397,7 +462,7 @@ for si, (sc, dur, cues, t0) in enumerate(plan):
                           "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", tmp], stdin=subprocess.PIPE)
     nf = int(round(dur * FPS))
     for fi in range(nf):
-        t = fi / FPS; img = BG.copy(); draw_scene(sc, t, dur, img)
+        t = fi / FPS; img = BG.copy(); draw_scene(sc, t, dur, img); draw_stamp(sc, t, img); img = camera(img, sc, t, dur)
         draw_sub(img, next((c[2] for c in cues if c[0] <= t < c[1]), ""))
         progress(img, (t0 + t) / total)
         if t > dur - 0.2: img = Image.blend(img, BG, (t - (dur - 0.2)) / 0.2 * 0.6)

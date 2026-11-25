@@ -5,7 +5,9 @@ Claude skill：把任何话题 / 文章 / 链接 / 文件做成约 2 分钟、�
 ## 文件
 - `SKILL.md` — skill 本体（流程、脚本写作规则、分镜格式；内嵌 render.py）
 - `scripts/render.py` — 渲染器（与 SKILL.md 内嵌版本一致）
+- `scripts/bazi.py` — 八字排盘（lunar_python；真太阳时、子时流派、时辰不详），输出 `bazi` 命盘与 `dayun` 大运场景（与 SKILL.md 内嵌版本一致）
 - `examples/coffee_storyboard.json` — 样例分镜（咖啡为什么让你清醒）
+- `examples/bazi_storyboard.json` — 八字样例分镜（命盘 + 大运，带圈注）
 
 ## 配音
 默认用 ElevenLabs 声音 `E3IuT6dcpXhUwXqAw9Or`（Dennis - Warm & Clear），通过 ElevenLabs 连接器按场景生成，下载到 `audio/01.mp3…`，分镜里设 `"audio_dir": "audio"`。不设 `audio_dir` 时用离线 sherpa-onnx 女声作后备。

@@ -143,9 +143,107 @@ M = int(80 * S)  # 边距
 TOP = int((260 if VERT else 90) * S)
 SUB_Y = H - int((430 if VERT else 150) * S)  # 字幕区顶
 
+# ---------- 八字命盘 / 大运 ----------
+WX = {}
+for chs, col in (("甲乙寅卯", (46, 139, 87)), ("丙丁巳午", (205, 50, 40)), ("戊己辰戌丑未", (156, 102, 31)),
+                 ("庚辛申酉", (196, 150, 20)), ("壬癸亥子", (30, 90, 170))):
+    for c in chs: WX[c] = col
+def wx(c): return WX.get(c, T["sub"])
+
+def cue_time(sc, k):
+    st = sc.get("_starts") or [0.6]
+    return max(0.6, st[min(k, len(st) - 1)])
+
+def hl_box(d, box, k, label=None):
+    if k <= 0: return
+    x0, y0, x1, y1 = box; pad = 6 * S * k
+    d.rounded_rectangle([x0 - pad, y0 - pad, x1 + pad, y1 + pad], radius=int(18 * S), outline=T["acc"], width=max(2, int(6 * S * k)))
+    if label:
+        f = font(34); tw = d.textlength(label, font=f)
+        d.rounded_rectangle([(x0 + x1) / 2 - tw / 2 - 14 * S, y1 + pad + 6 * S, (x0 + x1) / 2 + tw / 2 + 14 * S, y1 + pad + 56 * S], radius=int(12 * S), fill=T["acc"])
+        d.text(((x0 + x1) / 2 - tw / 2, y1 + pad + 10 * S), label, font=f, fill=T["bg1"])
+
+def draw_bazi(sc, t, img):
+    """四柱命盘：十神/天干/地支/藏干(带十神)/纳音/十二长生，五行着色；hl 按 cue 圈出要点"""
+    d = ImageDraw.Draw(img); ch = sc["chart"]; cols = ch["cols"]; base = T["bg1"]
+    k_head = ease(t / 0.5)
+    hh = text_block(d, (W / 2, TOP + (1 - k_head) * 30 * S), sc.get("heading", ""), font(64), T["fg"], W - 2 * M, alpha=k_head, base=base)
+    y = TOP + hh + 50 * S
+    lw = 120 * S; cw = (W - 2 * M - lw) / len(cols)
+    rows = [("", 64), ("十神", 64), ("天干", 150), ("地支", 150), ("藏干", 168), ("纳音", 62), ("长生", 62)]
+    top = y; ys = {}
+    for name, h in rows: ys[name or "柱"] = (y, y + h * S); y += h * S
+    d.rounded_rectangle([M - 10 * S, top - 10 * S, W - M + 10 * S, y + 10 * S], radius=int(24 * S), fill=blend(T["card"], base, k_head))
+    for name, _ in rows[1:]:
+        y0, y1 = ys[name]; f = font(34, False)
+        d.text((M + 18 * S, (y0 + y1) / 2 - f.size * 0.62), name, font=f, fill=blend(T["sub"], T["card"], k_head))
+        d.line([M + 10 * S, y0, W - M - 10 * S, y0], fill=blend(T["bg2"], T["card"], k_head), width=max(1, int(2 * S)))
+    cell = {}
+    for i, c in enumerate(cols):
+        k = ease((t - 0.4 - i * 0.3) / 0.45)
+        x0 = M + lw + i * cw; cx = x0 + cw / 2
+        for name in ys: cell[(i, name)] = (x0 + 8 * S, ys[name][0] + 4 * S, x0 + cw - 8 * S, ys[name][1] - 4 * S)
+        if k <= 0: continue
+        def ctext(name, s, f, col):
+            y0, y1 = ys[name]; tw = d.textlength(s, font=f)
+            d.text((cx - tw / 2, (y0 + y1) / 2 - f.size * 0.62), s, font=f, fill=blend(col, T["card"], k))
+        ctext("柱", c["name"], font(38), T["sub"])
+        ctext("十神", c["ss"], font(40), T["acc"] if c["ss"] == "日主" else T["fg"])
+        ctext("天干", c["gan"], font(118), wx(c["gan"]))
+        ctext("地支", c["zhi"], font(118), wx(c["zhi"]))
+        y0, y1 = ys["藏干"]; f = font(36, False); n = max(1, len(c["hide"]))
+        for j, (hg, hs) in enumerate(c["hide"]):
+            yy = y0 + (y1 - y0) * (j + 0.5) / 3 - f.size * 0.62 + (3 - n) * (y1 - y0) / 6
+            s1 = hg; s2 = hs; w1 = d.textlength(s1, font=font(36)); w2 = d.textlength(s2, font=f)
+            xx = cx - (w1 + 8 * S + w2) / 2
+            d.text((xx, yy), s1, font=font(36), fill=blend(wx(hg), T["card"], k)); d.text((xx + w1 + 8 * S, yy), s2, font=f, fill=blend(T["sub"], T["card"], k))
+        ctext("纳音", c["nayin"], font(34, False), T["sub"])
+        ctext("长生", c["dishi"], font(34, False), T["sub"])
+    ny = y + 40 * S
+    for line in ch.get("notes", []):
+        ny += text_block(d, (W / 2, ny), line, font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base) + 6 * S
+    # hl: {"cells":[[列,"天干"|"地支"|"十神"|"藏干"|"柱"],...], "label":"丙辛合", "cue":句号}
+    # 圈注框画在格子上；标签不压盘面，按出现顺序排成表下一行药丸
+    tags = []
+    for h in sc.get("hl", []):
+        k = ease((t - cue_time(sc, h.get("cue", 0))) / 0.4)
+        for ci, rn in h["cells"]: hl_box(d, cell[(ci, rn)], k)
+        if h.get("label") and k > 0: tags.append((h["label"], k))
+    if tags:
+        f = font(40); pw = [d.textlength(s, font=f) + 44 * S for s, _ in tags]
+        x = W / 2 - (sum(pw) + 20 * S * (len(tags) - 1)) / 2; ty = ny + 30 * S
+        for (s, k), w in zip(tags, pw):
+            d.rounded_rectangle([x, ty + (1 - k) * 20 * S, x + w, ty + 70 * S + (1 - k) * 20 * S], radius=int(35 * S), fill=blend(T["acc"], base, k))
+            d.text((x + 22 * S, ty + 12 * S + (1 - k) * 20 * S), s, font=f, fill=blend(T["bg1"], T["acc"], k)); x += w + 20 * S
+
+def draw_dayun(sc, t, img):
+    """大运：2×4 格，干支五行着色 + 起运年/岁；hl 列出要圈的步序 {"i":2,"label":"嫁蒋","cue":0}"""
+    d = ImageDraw.Draw(img); base = T["bg1"]; k_head = ease(t / 0.5)
+    hh = text_block(d, (W / 2, TOP + (1 - k_head) * 30 * S), sc.get("heading", "大运"), font(64), T["fg"], W - 2 * M, alpha=k_head, base=base)
+    y0 = TOP + hh + 60 * S; dy = sc["dayun"][:8]; per = 4 if VERT else 8
+    gap = 22 * S; bw = (W - 2 * M - gap * (per - 1)) / per; bh = 300 * S
+    boxes = []
+    for i, x in enumerate(dy):
+        r, c = divmod(i, per); bx = M + c * (bw + gap); by = y0 + r * (bh + 110 * S)
+        boxes.append((bx, by, bx + bw, by + bh)); k = ease((t - 0.4 - i * 0.12) / 0.4)
+        if k <= 0: continue
+        d.rounded_rectangle(boxes[-1], radius=int(20 * S), fill=blend(T["card"], base, k))
+        f = font(92); cx = bx + bw / 2
+        for j, chh in enumerate(x["gz"]):
+            tw = d.textlength(chh, font=f); d.text((cx - tw / 2, by + 20 * S + j * 100 * S), chh, font=f, fill=blend(wx(chh), T["card"], k))
+        s = f"{x['year']}·{x['age']}岁"; fs = font(30, False); tw = d.textlength(s, font=fs)
+        d.text((cx - tw / 2, by + bh - 50 * S), s, font=fs, fill=blend(T["sub"], T["card"], k))
+    if sc.get("note"):
+        rows = (len(dy) + per - 1) // per
+        text_block(d, (W / 2, y0 + rows * (bh + 110 * S) - 40 * S), sc["note"], font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base)
+    for h in sc.get("hl", []):
+        if h["i"] < len(boxes): hl_box(d, boxes[h["i"]], ease((t - cue_time(sc, h.get("cue", 0))) / 0.4), h.get("label"))
+
 def draw_scene(sc, t, dur, img):
     d = ImageDraw.Draw(img)
     lay = sc.get("layout", "big")
+    if lay == "bazi": return draw_bazi(sc, t, img)
+    if lay == "dayun": return draw_dayun(sc, t, img)
     items = sc.get("items", [])
     n = max(1, len(items))
     # 元素出现时刻：显式at(秒) / cue(第几句) / 按句子均匀分配

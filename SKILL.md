@@ -23,6 +23,24 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
   3. **一个生活化比喻**（把抽象概念换成日常物件：钥匙和锁、水管、排队……）
 - 材料太大装不进2分钟 → 只讲一个主线，其余放进脚本 md 的“未展开”清单，不硬塞。
 
+## 1.5 八字/命理类视频：专业排盘（话题涉及八字、四柱、大运、某人命盘时必做）
+- **自己重新排盘，不照抄原文**：把下方 `bazi.py` 原样写入工作目录，`pip install --break-system-packages -q lunar_python`，然后：
+  `python3 bazi.py --solar "1898-03-04 12:00" --gender F [--lon 出生地经度] [--no-hour] [--sect 2]`（只有农历日期就用 `--lunar "1898-02-12 12:00"`）。
+  会打印文字命盘（贴进脚本 md），并写出 `bazi_scenes.json`，里面有两个现成场景：`bazi`（命盘）和 `dayun`（大运）。
+- **逐项核对原文**：四柱、十神、藏干、日空、大运干支、起运岁数和交运年份、顺排还是逆排（阳男阴女顺排，阴男阳女逆排）。原文写错就在脚本 md 的“核对”里标出来，口播以复算结果为准。
+- **专业细节**：
+  - 换年换月以节气为准（立春换年、节令换月），不按正月初一换年。出生日期靠近节气交接时，在 md 里提示边界。
+  - 给了出生地就加 `--lon`，按真太阳时排（经度差＋均时差），命盘下方会注明校正了几分钟。
+  - 子时流派默认 `--sect 2`（晚子时日柱不换日），23–24 点出生的要在 md 里说明用的是哪派。
+  - 时辰不详时用 `--no-hour`，只排三柱，时柱显示“不详”。原文自己推出来的时辰，在 heading 或口播里说明是“推定时辰”。
+  - 有生年争议的，每个版本各排一张命盘。
+- **分镜**：至少放一个 `bazi` 命盘场景，原文讲大运时再放一个 `dayun` 场景，代替纯文字卡片。用 `hl` 跟着口播圈出被讲到的字（透干、合冲、空亡等）：
+  - `bazi`：`"hl":[{"cells":[[1,"天干"],[3,"天干"]],"label":"偏印双透","cue":1}]`（列号 0 年、1 月、2 日、3 时；行可选 `柱`/`十神`/`天干`/`地支`/`藏干`）。圈注框画在格子上，标签排成表下一行的药丸，不压盘面。
+  - `dayun`：`"hl":[{"i":2,"label":"嫁蒋","cue":0}]`（i 是第几步大运，从 0 数）。
+  - 命盘场景不受“屏幕文字≤12字”的限制，但 heading 要短，比如“1898年 坤造”。
+- **口播**：干支照字读（“戊戌年，甲寅月”）。术语第一次出现时用一句大白话带过，比如“偏印就是生你、护你的那股力量”。合冲刑害要说清是哪两个字，比如“丙辛合，寅亥合”。
+- 涉及真实人物的争议史料（贪腐、政治指控等），与命理主线无关的放进“未展开”，不进口播。
+
 ## 2. 写口播稿（最关键）
 **字数**：ElevenLabs Dennis 首次实测约 300 字/分钟（不含场景间停顿）。2 分钟 = **500–540 个有效汉字**（不算标点）。超了就删，不要靠加速。生成配音后以渲染器打印的 `TOTAL` 为准，只重做超长/过短的场景。
 - narration 里不要写 ElevenLabs 语气标签（如 `[excited]`）：字幕直接取自 narration，标签会出现在字幕里。
@@ -72,7 +90,7 @@ description: "把任何话题、文章、链接或文件做成约2分钟、简�
   ]
 }
 ```
-- 版式：`hook`（大标题+小眉题）、`big`（金色大字，单个概念/数字/金句，`size` 可调字号）、`list`（编号卡片≤3）、`steps`（带箭头的流程≤3）、`compare`（左右两栏，恰好2项）、`end`。
+- 版式：`hook`（大标题+小眉题）、`big`（金色大字，单个概念/数字/金句，`size` 可调字号）、`list`（编号卡片≤3）、`steps`（带箭头的流程≤3）、`compare`（左右两栏，恰好2项）、`end`；八字类另有 `bazi`（四柱命盘：十神/天干/地支/藏干/纳音/长生，五行着色）和 `dayun`（大运 2×4 格），由 `bazi.py` 生成，见 1.5 节。
 - 屏幕文字是**关键词，不是字幕**：heading ≤12字，卡片 title ≤6字、text ≤14字。`\n` 手动换行。
 - `cue`：该卡片在第几句口播（从0数）开始时出现；不写则按句子均匀分配。也可用 `at`（秒）。让画面和“第一、第二”同步。
 - 外部配音：设 `voice_file`，并给每个场景填 `dur`（秒），字幕按字数比例分配。
@@ -107,7 +125,7 @@ mkdir -p /tmp/tts && cd /tmp/tts
 字体用系统 Noto Sans CJK（`/usr/share/fonts/opentype/noto/`）。若 GitHub 下载失败：告诉用户，并改为请用户提供配音文件（`voice_file`），其余流程不变。
 
 ## 5. 渲染
-把下方 `render.py` 原样写入工作目录，然后：
+把下方 `render.py` 原样写入工作目录（八字类再写入 `bazi.py`），然后：
 1. **先预览**：`PREVIEW=1 python3 render.py storyboard.json out.mp4` → 生成配音、打印每场景秒数和 `TOTAL`，输出 `_build/preview_XX.png`（每场景 85% 时刻的满屏帧）。
    - `TOTAL` 不在 110–130s → 改稿（增删字），不要改 speed 超出 0.85–1.05。
    - 拼一张缩略总览看：`ffmpeg -i _build/preview_%02d.png -vf "scale=360:-1,tile=4x2" sheet.png`，用 Read 检查：文字溢出、卡片挤、字幕遮挡、空场景。
@@ -267,9 +285,107 @@ M = int(80 * S)  # 边距
 TOP = int((260 if VERT else 90) * S)
 SUB_Y = H - int((430 if VERT else 150) * S)  # 字幕区顶
 
+# ---------- 八字命盘 / 大运 ----------
+WX = {}
+for chs, col in (("甲乙寅卯", (46, 139, 87)), ("丙丁巳午", (205, 50, 40)), ("戊己辰戌丑未", (156, 102, 31)),
+                 ("庚辛申酉", (196, 150, 20)), ("壬癸亥子", (30, 90, 170))):
+    for c in chs: WX[c] = col
+def wx(c): return WX.get(c, T["sub"])
+
+def cue_time(sc, k):
+    st = sc.get("_starts") or [0.6]
+    return max(0.6, st[min(k, len(st) - 1)])
+
+def hl_box(d, box, k, label=None):
+    if k <= 0: return
+    x0, y0, x1, y1 = box; pad = 6 * S * k
+    d.rounded_rectangle([x0 - pad, y0 - pad, x1 + pad, y1 + pad], radius=int(18 * S), outline=T["acc"], width=max(2, int(6 * S * k)))
+    if label:
+        f = font(34); tw = d.textlength(label, font=f)
+        d.rounded_rectangle([(x0 + x1) / 2 - tw / 2 - 14 * S, y1 + pad + 6 * S, (x0 + x1) / 2 + tw / 2 + 14 * S, y1 + pad + 56 * S], radius=int(12 * S), fill=T["acc"])
+        d.text(((x0 + x1) / 2 - tw / 2, y1 + pad + 10 * S), label, font=f, fill=T["bg1"])
+
+def draw_bazi(sc, t, img):
+    """四柱命盘：十神/天干/地支/藏干(带十神)/纳音/十二长生，五行着色；hl 按 cue 圈出要点"""
+    d = ImageDraw.Draw(img); ch = sc["chart"]; cols = ch["cols"]; base = T["bg1"]
+    k_head = ease(t / 0.5)
+    hh = text_block(d, (W / 2, TOP + (1 - k_head) * 30 * S), sc.get("heading", ""), font(64), T["fg"], W - 2 * M, alpha=k_head, base=base)
+    y = TOP + hh + 50 * S
+    lw = 120 * S; cw = (W - 2 * M - lw) / len(cols)
+    rows = [("", 64), ("十神", 64), ("天干", 150), ("地支", 150), ("藏干", 168), ("纳音", 62), ("长生", 62)]
+    top = y; ys = {}
+    for name, h in rows: ys[name or "柱"] = (y, y + h * S); y += h * S
+    d.rounded_rectangle([M - 10 * S, top - 10 * S, W - M + 10 * S, y + 10 * S], radius=int(24 * S), fill=blend(T["card"], base, k_head))
+    for name, _ in rows[1:]:
+        y0, y1 = ys[name]; f = font(34, False)
+        d.text((M + 18 * S, (y0 + y1) / 2 - f.size * 0.62), name, font=f, fill=blend(T["sub"], T["card"], k_head))
+        d.line([M + 10 * S, y0, W - M - 10 * S, y0], fill=blend(T["bg2"], T["card"], k_head), width=max(1, int(2 * S)))
+    cell = {}
+    for i, c in enumerate(cols):
+        k = ease((t - 0.4 - i * 0.3) / 0.45)
+        x0 = M + lw + i * cw; cx = x0 + cw / 2
+        for name in ys: cell[(i, name)] = (x0 + 8 * S, ys[name][0] + 4 * S, x0 + cw - 8 * S, ys[name][1] - 4 * S)
+        if k <= 0: continue
+        def ctext(name, s, f, col):
+            y0, y1 = ys[name]; tw = d.textlength(s, font=f)
+            d.text((cx - tw / 2, (y0 + y1) / 2 - f.size * 0.62), s, font=f, fill=blend(col, T["card"], k))
+        ctext("柱", c["name"], font(38), T["sub"])
+        ctext("十神", c["ss"], font(40), T["acc"] if c["ss"] == "日主" else T["fg"])
+        ctext("天干", c["gan"], font(118), wx(c["gan"]))
+        ctext("地支", c["zhi"], font(118), wx(c["zhi"]))
+        y0, y1 = ys["藏干"]; f = font(36, False); n = max(1, len(c["hide"]))
+        for j, (hg, hs) in enumerate(c["hide"]):
+            yy = y0 + (y1 - y0) * (j + 0.5) / 3 - f.size * 0.62 + (3 - n) * (y1 - y0) / 6
+            s1 = hg; s2 = hs; w1 = d.textlength(s1, font=font(36)); w2 = d.textlength(s2, font=f)
+            xx = cx - (w1 + 8 * S + w2) / 2
+            d.text((xx, yy), s1, font=font(36), fill=blend(wx(hg), T["card"], k)); d.text((xx + w1 + 8 * S, yy), s2, font=f, fill=blend(T["sub"], T["card"], k))
+        ctext("纳音", c["nayin"], font(34, False), T["sub"])
+        ctext("长生", c["dishi"], font(34, False), T["sub"])
+    ny = y + 40 * S
+    for line in ch.get("notes", []):
+        ny += text_block(d, (W / 2, ny), line, font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base) + 6 * S
+    # hl: {"cells":[[列,"天干"|"地支"|"十神"|"藏干"|"柱"],...], "label":"丙辛合", "cue":句号}
+    # 圈注框画在格子上；标签不压盘面，按出现顺序排成表下一行药丸
+    tags = []
+    for h in sc.get("hl", []):
+        k = ease((t - cue_time(sc, h.get("cue", 0))) / 0.4)
+        for ci, rn in h["cells"]: hl_box(d, cell[(ci, rn)], k)
+        if h.get("label") and k > 0: tags.append((h["label"], k))
+    if tags:
+        f = font(40); pw = [d.textlength(s, font=f) + 44 * S for s, _ in tags]
+        x = W / 2 - (sum(pw) + 20 * S * (len(tags) - 1)) / 2; ty = ny + 30 * S
+        for (s, k), w in zip(tags, pw):
+            d.rounded_rectangle([x, ty + (1 - k) * 20 * S, x + w, ty + 70 * S + (1 - k) * 20 * S], radius=int(35 * S), fill=blend(T["acc"], base, k))
+            d.text((x + 22 * S, ty + 12 * S + (1 - k) * 20 * S), s, font=f, fill=blend(T["bg1"], T["acc"], k)); x += w + 20 * S
+
+def draw_dayun(sc, t, img):
+    """大运：2×4 格，干支五行着色 + 起运年/岁；hl 列出要圈的步序 {"i":2,"label":"嫁蒋","cue":0}"""
+    d = ImageDraw.Draw(img); base = T["bg1"]; k_head = ease(t / 0.5)
+    hh = text_block(d, (W / 2, TOP + (1 - k_head) * 30 * S), sc.get("heading", "大运"), font(64), T["fg"], W - 2 * M, alpha=k_head, base=base)
+    y0 = TOP + hh + 60 * S; dy = sc["dayun"][:8]; per = 4 if VERT else 8
+    gap = 22 * S; bw = (W - 2 * M - gap * (per - 1)) / per; bh = 300 * S
+    boxes = []
+    for i, x in enumerate(dy):
+        r, c = divmod(i, per); bx = M + c * (bw + gap); by = y0 + r * (bh + 110 * S)
+        boxes.append((bx, by, bx + bw, by + bh)); k = ease((t - 0.4 - i * 0.12) / 0.4)
+        if k <= 0: continue
+        d.rounded_rectangle(boxes[-1], radius=int(20 * S), fill=blend(T["card"], base, k))
+        f = font(92); cx = bx + bw / 2
+        for j, chh in enumerate(x["gz"]):
+            tw = d.textlength(chh, font=f); d.text((cx - tw / 2, by + 20 * S + j * 100 * S), chh, font=f, fill=blend(wx(chh), T["card"], k))
+        s = f"{x['year']}·{x['age']}岁"; fs = font(30, False); tw = d.textlength(s, font=fs)
+        d.text((cx - tw / 2, by + bh - 50 * S), s, font=fs, fill=blend(T["sub"], T["card"], k))
+    if sc.get("note"):
+        rows = (len(dy) + per - 1) // per
+        text_block(d, (W / 2, y0 + rows * (bh + 110 * S) - 40 * S), sc["note"], font(36, False), T["sub"], W - 2 * M, alpha=k_head, base=base)
+    for h in sc.get("hl", []):
+        if h["i"] < len(boxes): hl_box(d, boxes[h["i"]], ease((t - cue_time(sc, h.get("cue", 0))) / 0.4), h.get("label"))
+
 def draw_scene(sc, t, dur, img):
     d = ImageDraw.Draw(img)
     lay = sc.get("layout", "big")
+    if lay == "bazi": return draw_bazi(sc, t, img)
+    if lay == "dayun": return draw_dayun(sc, t, img)
     items = sc.get("items", [])
     n = max(1, len(items))
     # 元素出现时刻：显式at(秒) / cue(第几句) / 按句子均匀分配
@@ -446,4 +562,75 @@ else:
 cmd += ["-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", OUT]
 subprocess.run(cmd, check=True)
 print("DONE", OUT)
+```
+
+## bazi.py
+```python
+#!/usr/bin/env python3
+"""bazi.py — 排盘 → 命盘场景 JSON（供 render.py 的 bazi / dayun 版式）
+用法：
+  python3 bazi.py --solar "1898-03-04 12:00" --gender F [--lon 121.47] [--no-hour] [--sect 2]
+  python3 bazi.py --lunar "1898-02-12 12:00" --gender F ...
+输出：stdout 打印文字命盘（贴进脚本md）；写 bazi_scenes.json（两个场景：bazi 命盘 + dayun 大运）。
+--lon  出生地经度，换算真太阳时（经度差 + 均时差）；不给则按北京时间。
+--no-hour  时辰不详：只排三柱，时柱显示「不详」。
+--sect 1|2  子时流派：2=晚子时日柱不换日（默认），1=23点即换日。"""
+import argparse, json, math, datetime as dt
+from lunar_python import Solar, Lunar
+
+ap = argparse.ArgumentParser()
+g = ap.add_mutually_exclusive_group(required=True)
+g.add_argument("--solar"); g.add_argument("--lunar")
+ap.add_argument("--gender", choices=["M", "F"], required=True)
+ap.add_argument("--lon", type=float); ap.add_argument("--no-hour", action="store_true")
+ap.add_argument("--sect", type=int, default=2, choices=[1, 2]); ap.add_argument("--out", default="bazi_scenes.json")
+A = ap.parse_args()
+
+def parse(s):
+    d, t = (s.split() + ["12:00"])[:2]; y, m, dd = map(int, d.split("-")); hh, mm = map(int, t.split(":")); return y, m, dd, hh, mm
+if A.solar:
+    s0 = dt.datetime(*parse(A.solar))
+else:
+    y, m, d, hh, mm = parse(A.lunar); so = Lunar.fromYmdHms(y, m, d, hh, mm, 0).getSolar()
+    s0 = dt.datetime(so.getYear(), so.getMonth(), so.getDay(), hh, mm)
+note_t = ""
+if A.lon is not None and not A.no_hour:
+    n = s0.timetuple().tm_yday; B = 2 * math.pi * (n - 81) / 364
+    eot = 9.87 * math.sin(2 * B) - 7.53 * math.cos(B) - 1.5 * math.sin(B)
+    off = 4 * (A.lon - 120) + eot; s1 = s0 + dt.timedelta(minutes=off)
+    note_t = f"真太阳时 {s1:%H:%M}（经度{A.lon}°，校正{off:+.0f}分）"; s0 = s1
+sol = Solar.fromYmdHms(s0.year, s0.month, s0.day, s0.hour, s0.minute, 0)
+ec = sol.getLunar().getEightChar(); ec.setSect(A.sect)
+P = [("年柱", "Year"), ("月柱", "Month"), ("日柱", "Day"), ("时柱", "Time")]
+cols = []
+for i, (nm, k) in enumerate(P):
+    if k == "Time" and A.no_hour:
+        cols.append(dict(name=nm, ss="", gan="?", zhi="?", hide=[], nayin="时辰不详", dishi="")); continue
+    gz = getattr(ec, f"get{k}")()
+    ss = "日主" if k == "Day" else getattr(ec, f"get{k}ShiShenGan")()
+    hide = list(zip(getattr(ec, f"get{k}HideGan")(), getattr(ec, f"get{k}ShiShenZhi")()))
+    cols.append(dict(name=nm, ss=ss, gan=gz[0], zhi=gz[1], hide=[list(h) for h in hide],
+                     nayin=getattr(ec, f"get{k}NaYin")(), dishi=getattr(ec, f"get{k}DiShi")()))
+yun = ec.getYun(1 if A.gender == "M" else 0)
+dys = [d for d in yun.getDaYun()[1:9]]
+qy = f"{yun.getStartYear()}岁{yun.getStartMonth()}个月起运（{yun.getStartSolar().toYmd()}交运）"
+zao = "乾造" if A.gender == "M" else "坤造"
+notes = [f"{zao} · 公历 {sol.toYmd()}" + ("" if A.no_hour else f" {s0:%H:%M}") + f" · 农历 {sol.getLunar().getYearInGanZhi()}年{sol.getLunar().getMonthInChinese()}月{sol.getLunar().getDayInChinese()}",
+         f"日空 {ec.getDayXunKong()} · {qy}"]
+if note_t: notes.append(note_t)
+scenes = [
+    {"layout": "bazi", "heading": f"{sol.getYear()}年 {zao}", "chart": {"cols": cols, "notes": notes}, "hl": [], "narration": ""},
+    {"layout": "dayun", "heading": "大运", "dayun": [{"gz": d.getGanZhi(), "year": d.getStartYear(), "age": d.getStartAge()} for d in dys],
+     "note": qy + ("，顺排" if yun.isForward() else "，逆排"), "hl": [], "narration": ""},
+]
+json.dump(scenes, open(A.out, "w"), ensure_ascii=False, indent=1)
+# 文字命盘
+print(notes[0]); print("      " + "  ".join(c["name"] for c in cols))
+print("十神  " + "  ".join(f"{c['ss']:<4}" for c in cols))
+print("天干  " + "    ".join(c["gan"] for c in cols)); print("地支  " + "    ".join(c["zhi"] for c in cols))
+for r in range(3): print(("藏干  " if r == 0 else "      ") + "  ".join((f"{c['hide'][r][0]}{c['hide'][r][1]}" if r < len(c['hide']) else "    ").ljust(4) for c in cols))
+print("纳音  " + "  ".join(c["nayin"] for c in cols)); print("长生  " + "  ".join(f"{c['dishi']:<4}" for c in cols))
+for n in notes[1:]: print(n)
+print("大运  " + "  ".join(f"{d['gz']}{d['year']}" for d in scenes[1]["dayun"]))
+print(f"→ {A.out}")
 ```
